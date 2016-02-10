@@ -1,6 +1,9 @@
 package net
 
 import (
+	"fmt"
+	"io/ioutil"
+
 	"github.com/vishvananda/netlink"
 )
 
@@ -33,6 +36,36 @@ func DetectBridgeType(weaveBridgeName, datapathName string) BridgeType {
 	default:
 		return Inconsistent
 	}
+}
+
+func EnforceDockerBridgeAddrAssignType(bridgeName string) error {
+	addrAssignType, err := ioutil.ReadFile(fmt.Sprintf("/sys/class/net/%s/addr_assign_type", bridgeName))
+	if err != nil {
+		return err
+	}
+
+	// From include/uapi/linux/netdevice.h
+	// #define NET_ADDR_PERM       0   /* address is permanent (default) */
+	// #define NET_ADDR_RANDOM     1   /* address is generated randomly */
+	// #define NET_ADDR_STOLEN     2   /* address is stolen from other device */
+	// #define NET_ADDR_SET        3   /* address is set using dev_set_mac_address() */
+	if string(addrAssignType) != "3" {
+		link, err := netlink.LinkByName(bridgeName)
+		if err != nil {
+			return err
+		}
+
+		mac, err := RandomMAC()
+		if err != nil {
+			return err
+		}
+
+		if err := netlink.LinkSetHardwareAddr(link, mac); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func isBridge(link netlink.Link) bool {
