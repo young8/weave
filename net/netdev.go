@@ -114,3 +114,18 @@ func GetBridgeNetDev(bridgeName string) (Dev, error) {
 
 	return LinkToNetDev(link)
 }
+
+func DeviceIP(deviceName string) (net.IP, error) {
+	link, err := netlink.LinkByName(deviceName)
+	if err != nil {
+		return nil, err
+	}
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, err
+	}
+	if len(addrs) < 1 {
+		return nil, fmt.Errorf("No IPv4 addresses found for %s", deviceName)
+	}
+	return addrs[0].IPNet.IP, nil
+}

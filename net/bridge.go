@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/coreos/go-iptables/iptables"
 	"github.com/vishvananda/netlink"
 
 	"github.com/weaveworks/weave/common/odp"
@@ -29,6 +30,7 @@ type BridgeConfig struct {
 	NoFastdp         bool
 	NoBridgedFastdp  bool
 	MTU              int
+	Port             int
 }
 
 func CreateBridge(config *BridgeConfig) (BridgeType, error) {
@@ -66,7 +68,9 @@ func CreateBridge(config *BridgeConfig) (BridgeType, error) {
 			return None, err
 		}
 
-		configureIPTables(config)
+		if err = configureIPTables(config); err != nil {
+			return bridgeType, err
+		}
 	}
 
 	if bridgeType == Bridge {
@@ -243,7 +247,54 @@ func initBridgedFastdp(config *BridgeConfig) error {
 }
 
 func configureIPTables(config *BridgeConfig) error {
-	return fmt.Errorf("Not implemented")
+	ipt, err := iptables.New()
+	if err != nil {
+		return err
+	}
+	if config.WeaveBridgeName != config.DockerBridgeName {
+		err := ipt.Insert("filter", "FORWARD", 1, "-i", config.DockerBridgeName, "-o", config.WeaveBridgeName, "-j", "DROP")
+		if err != nil {
+			return err
+		}
+	}
+
+	dockerBridgeIP, err := DeviceIP(config.DockerBridgeName)
+	if err != nil {
+		return err
+	}
+
+	// forbid traffic to the Weave port from other containers
+	if err = ipt.AppendUnique("filter", "INPUT", "-i", config.DockerBridgeName, "-p", "tcp", "--dst", dockerBridgeIP.String(), "--dport", fmt.Sprint(config.Port), "-j", "DROP"); err != nil {
+		return err
+	}
+	if err = ipt.AppendUnique("filter", "INPUT", "-i", config.DockerBridgeName, "-p", "udp", "--dst", dockerBridgeIP.String(), "--dport", fmt.Sprint(config.Port), "-j", "DROP"); err != nil {
+		return err
+	}
+	if err = ipt.AppendUnique("filter", "INPUT", "-i", config.DockerBridgeName, "-p", "udp", "--dst", dockerBridgeIP.String(), "--dport", fmt.Sprint(config.Port+1), "-j", "DROP"); err != nil {
+		return err
+	}
+
+	// let DNS traffic to weaveDNS, since otherwise it might get blocked by the likes of UFW
+	if err = ipt.AppendUnique("filter", "INPUT", "-i", config.DockerBridgeName, "-p", "udp", "--dport", "53", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+	if err = ipt.AppendUnique("filter", "INPUT", "-i", config.DockerBridgeName, "-p", "tcp", "--dport", "53", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
+	// Work around the situation where there are no rules allowing traffic
+	// across our bridge. E.g. ufw
+	if err = ipt.AppendUnique("filter", "FORWARD", "-i", config.WeaveBridgeName, "-o", config.WeaveBridgeName, "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
+	// create a chain for masquerading
+	ipt.NewChain("nat", "WEAVE")
+	if err = ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE"); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func linkSetUpByName(linkName string) error {
