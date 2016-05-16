@@ -90,6 +90,23 @@ func CreateBridge(config *BridgeConfig) (BridgeType, error) {
 	return bridgeType, nil
 }
 
+// Returns a string that is consistent with the weave script
+func (t BridgeType) String() string {
+	switch t {
+	case None:
+		return "none"
+	case Bridge:
+		return "bridge"
+	case Fastdp:
+		return "fastdp"
+	case BridgedFastdp:
+		return "bridged_fastdp"
+	case Inconsistent:
+		return "inconsistent"
+	}
+	return "unknown"
+}
+
 func DetectBridgeType(weaveBridgeName, datapathName string) BridgeType {
 	bridge, _ := netlink.LinkByName(weaveBridgeName)
 	datapath, _ := netlink.LinkByName(datapathName)
