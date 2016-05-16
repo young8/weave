@@ -174,8 +174,14 @@ func initBridge(config *BridgeConfig) error {
 	linkAttrs := netlink.NewLinkAttrs()
 	linkAttrs.Name = config.WeaveBridgeName
 	linkAttrs.HardwareAddr = mac
-	linkAttrs.MTU = config.MTU // TODO this probably doesn't work - see weave script
-	netlink.LinkAdd(&netlink.Bridge{LinkAttrs: linkAttrs})
+	mtu := config.MTU
+	if mtu == 0 {
+		mtu = 65535
+	}
+	linkAttrs.MTU = mtu // TODO this probably doesn't work - see weave script
+	if err = netlink.LinkAdd(&netlink.Bridge{LinkAttrs: linkAttrs}); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -185,7 +191,16 @@ func initFastdp(config *BridgeConfig) error {
 	if err != nil {
 		return err
 	}
-	return netlink.LinkSetMTU(datapath, config.MTU)
+	mtu := config.MTU
+	if mtu == 0 {
+		/* GCE has the lowest underlay network MTU we're likely to encounter on
+		   a local network, at 1460 bytes.  To get the overlay MTU from that we
+		   subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
+		   UDP header, 8 bytes for the vxlan header, and 14 bytes for the inner
+		   ethernet header. */
+		mtu = 1410
+	}
+	return netlink.LinkSetMTU(datapath, mtu)
 }
 
 func initBridgedFastdp(config *BridgeConfig) error {
