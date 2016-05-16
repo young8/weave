@@ -18,8 +18,8 @@ func RandomMAC() (net.HardwareAddr, error) {
 	return net.HardwareAddr(mac), nil
 }
 
-func PersistentMAC() (net.HardwareAddr, error) {
-	systemUUID, err := ioutil.ReadFile("/sys/class/dmi/id/product_uuid")
+func PersistentMAC(filename string) (net.HardwareAddr, error) {
+	systemUUID, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

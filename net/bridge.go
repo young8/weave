@@ -153,11 +153,21 @@ func isDatapath(link netlink.Link) bool {
 }
 
 func initBridge(config *BridgeConfig) error {
-	mac, err := PersistentMAC()
+	/* Derive the bridge MAC from the system (aka bios) UUID, or,
+	   failing that, the hypervisor UUID. Elsewhere we in turn derive
+	   the peer name from that, which we want to be stable across
+	   reboots but otherwise unique. The system/hypervisor UUID fits
+	   that bill, unlike, say, /etc/machine-id, which is often
+	   identical on VMs created from cloned filesystems. If we cannot
+	   determine the system/hypervisor UUID we just generate a random MAC. */
+	mac, err := PersistentMAC("/sys/class/dmi/id/product_uuid")
 	if err != nil {
-		mac, err = RandomMAC()
+		mac, err = PersistentMAC("/sys/hypervisor/uuid")
 		if err != nil {
-			return err
+			mac, err = RandomMAC()
+			if err != nil {
+				return err
+			}
 		}
 	}
 
