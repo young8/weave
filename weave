@@ -1828,7 +1828,7 @@ EOF
         else
             shift 1
         fi
-        create_bridge --without-ethtool "$@"
+        create_bridge
         ;;
     attach-bridge)
         if detect_bridge_type ; then
@@ -2085,7 +2085,7 @@ EOF
             [ $# -eq 2 -a "$1" = "-h" ] || usage
             FQDN="$2"
         fi
-        create_bridge --without-ethtool
+        create_bridge
         expose_ip
         util_op expose-nat $ALL_CIDRS
         show_addrs $ALL_CIDRS
@@ -2094,7 +2094,7 @@ EOF
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
         ipam_cidrs lookup weave:expose $CIDR_ARGS
-        create_bridge --without-ethtool
+        create_bridge
         for CIDR in $ALL_CIDRS ; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR ; then
                 ip addr del dev $BRIDGE $CIDR
