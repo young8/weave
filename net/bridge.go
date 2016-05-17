@@ -125,7 +125,7 @@ func DetectBridgeType(weaveBridgeName, datapathName string) BridgeType {
 	}
 }
 
-func EnforceDockerBridgeAddrAssignType(bridgeName string) error {
+func EnforceAddrAssignType(bridgeName string) error {
 	addrAssignType, err := ioutil.ReadFile(fmt.Sprintf("/sys/class/net/%s/addr_assign_type", bridgeName))
 	if err != nil {
 		return err

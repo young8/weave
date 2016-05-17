@@ -19,6 +19,7 @@ func init() {
 		"docker-tls-args":        dockerTLSArgs,
 		"create-bridge":          createBridge,
 		"detect-bridge-type":     detectBridgeType,
+		"enforce-addr-assign":    enforceAddrAsign,
 		"create-datapath":        createDatapath,
 		"delete-datapath":        deleteDatapath,
 		"add-datapath-interface": addDatapathInterface,
