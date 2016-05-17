@@ -252,7 +252,14 @@ func initBridgedFastdp(config *BridgeConfig) error {
 		return err
 	}
 
-	if err := odp.AddDatapathInterface(config.DatapathName, "vethwe-datapath"); err != nil {
+	if err := netlink.LinkSetUp(link); err != nil {
+		return err
+	}
+	if err := linkSetUpByName(link.PeerName); err != nil {
+		return err
+	}
+
+	if err := odp.AddDatapathInterface(config.DatapathName, link.PeerName); err != nil {
 		return err
 	}
 
