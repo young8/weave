@@ -529,7 +529,20 @@ enforce_docker_bridge_addr_assign_type() {
 # but are in an inconsistent state the script aborts with an error.
 detect_bridge_type() {
     BRIDGE_TYPE=$(util_op detect-bridge-type "$BRIDGE" "$DATAPATH")
-    [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
+    case "$BRIDGE_TYPE" in
+        bridge|bridged_fastdp)
+            ;;
+        fastdp)
+            DATAPATH="$BRIDGE"
+            ;;
+        inconsistent)
+            echo "Inconsistent bridge state detected. Please do 'weave reset' and try again." >&2
+            exit 1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 
     # WEAVE_MTU may have been specified when the bridge was
     # created (perhaps implicitly with WEAVE_NO_FASTDP).  So take
@@ -539,11 +552,33 @@ detect_bridge_type() {
 }
 
 create_bridge() {
+    validate_bridge_type
     BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP")
-    # Set some variables that are expected by code that comes later
-    [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
     MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
-    # Note we still need to check for inconsistent existing bridge
+}
+
+validate_bridge_type() {
+    detect_bridge_type || return 0
+
+    if [ -n "$LAUNCHING_ROUTER" ] ; then
+        if [ "$BRIDGE_TYPE" = bridge -a -z "$WEAVE_NO_FASTDP" ] ; then
+            cat <<EOF >&1
+WEAVE_NO_FASTDP is not set, but there is already a bridge present of
+the wrong type for fast datapath.  Please do 'weave reset' to remove
+the bridge first.
+EOF
+            return 1
+        fi
+        if [ "$BRIDGE_TYPE" != bridge -a -n "$WEAVE_NO_FASTDP" ] ; then
+            cat <<EOF >&1
+WEAVE_NO_FASTDP is set, but there is already a weave fast datapath
+bridge present.  Please do 'weave reset' to remove the bridge first.
+EOF
+            return 1
+        fi
+    fi
+
+    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP")
 }
 
 expose_ip() {
