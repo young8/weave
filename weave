@@ -529,7 +529,7 @@ enforce_docker_bridge_addr_assign_type() {
 # but are in an inconsistent state the script aborts with an error.
 detect_bridge_type() {
     BRIDGE_TYPE=$(util_op detect-bridge-type "$BRIDGE" "$DATAPATH")
-    # Note we still need to set BRIDGE, DATAPATH
+    [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
 
     # WEAVE_MTU may have been specified when the bridge was
     # created (perhaps implicitly with WEAVE_NO_FASTDP).  So take
@@ -540,7 +540,8 @@ detect_bridge_type() {
 
 create_bridge() {
     BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP")
-    # Should we get the computed MTU back from create-bridge?
+    # Set some variables that are expected by code that comes later
+    [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
     MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
     # Note we still need to check for inconsistent existing bridge
 }
