@@ -1506,6 +1506,8 @@ launch_router() {
     RESOLV_CONF_DIR=$(dirname "$RESOLV_CONF")
     RESOLV_CONF_BASE=$(basename "$RESOLV_CONF")
 
+    [ -n $WEAVE_NO_FASTDP ] && NOFASTDP_ARG="--no-fastdp"
+
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
@@ -1522,6 +1524,7 @@ launch_router() {
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
+        $NOFASTDP_ARG \
         $AWSVPC_ARGS \
         --http-addr $HTTP_ADDR \
         --status-addr $STATUS_ADDR \

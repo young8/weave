@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/profile"
+	"github.com/vishvananda/netlink"
 	"github.com/weaveworks/docker/pkg/mflag"
 	"github.com/weaveworks/mesh"
 
@@ -123,7 +124,6 @@ func main() {
 		networkConfig      weave.NetworkConfig
 		protocolMinVersion int
 		resume             bool
-		ifaceName          string
 		routerName         string
 		nickName           string
 		password           string
@@ -139,7 +139,6 @@ func main() {
 		peers              []string
 		noDNS              bool
 		dnsConfig          dnsConfig
-		datapathName       string
 		trustedSubnetStr   string
 		dbPrefix           string
 		isAWSVPC           bool
@@ -156,7 +155,6 @@ func main() {
 	mflag.IntVar(&config.Port, []string{"#port", "-port"}, mesh.Port, "router port")
 	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
 	mflag.BoolVar(&resume, []string{"-resume"}, false, "resume connections to previous peers")
-	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
 	mflag.StringVar(&bridgeConfig.WeaveBridgeName, []string{"-weave-bridge"}, "", "name of weave bridge")
 	mflag.StringVar(&bridgeConfig.DockerBridgeName, []string{"-docker-bridge"}, "", "name of Docker bridge")
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
@@ -183,7 +181,8 @@ func main() {
 	mflag.DurationVar(&dnsConfig.ClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
 	mflag.StringVar(&dnsConfig.EffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
 	mflag.StringVar(&dnsConfig.ResolvConf, []string{"-resolv-conf"}, "", "path to resolver configuration for fallback DNS lookups")
-	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
+	mflag.StringVar(&bridgeConfig.DatapathName, []string{"-datapath"}, "", "ODP datapath name")
+	mflag.BoolVar(&bridgeConfig.NoFastdp, []string{"-no-fastdp"}, false, "Disable Fast Datapath")
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
 	mflag.BoolVar(&isAWSVPC, []string{"-awsvpc"}, false, "use AWS VPC for routing")
@@ -227,13 +226,12 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	bridgeConfig.DatapathName = datapathName
 	if err := weavenet.EnforceAddrAssignType(bridgeConfig.DockerBridgeName); err != nil {
 		Log.Errorf("While checking address assignment type of %s: %s", bridgeConfig.DockerBridgeName, err)
 	}
-	_, err := weavenet.CreateBridge(&bridgeConfig)
+	bridgeType, err := weavenet.CreateBridge(&bridgeConfig)
 	checkFatal(err)
-	overlay, bridge := createOverlay(datapathName, ifaceName, isAWSVPC, config.Host, config.Port, bufSzMB)
+	overlay, bridge := createOverlay(bridgeType, bridgeConfig, isAWSVPC, config.Host, config.Port, bufSzMB)
 	networkConfig.Bridge = bridge
 
 	name := peerName(routerName, bridge.Interface())
@@ -408,29 +406,31 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func createOverlay(datapathName string, ifaceName string, isAWSVPC bool, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
+func createOverlay(bridgeType weavenet.BridgeType, config weavenet.BridgeConfig, isAWSVPC bool, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
 	overlay := weave.NewOverlaySwitch()
 	var bridge weave.Bridge
 	var ignoreSleeve bool
 
-	switch {
-	case isAWSVPC:
+	switch bridgeType {
+	case weavenet.AWSVPC:
 		vpc := weave.NewAWSVPC()
 		overlay.Add("awsvpc", vpc)
 		bridge = weave.NullBridge{}
 		// Currently, we do not support any overlay with AWSVPC
 		ignoreSleeve = true
-	case datapathName != "" && ifaceName != "":
-		Log.Fatal("At most one of --datapath and --iface must be specified.")
-	case datapathName != "":
-		iface, err := weavenet.EnsureInterface(datapathName)
+	case weavenet.Fastdp, weavenet.BridgedFastdp:
+		iface, err := weavenet.EnsureInterface(config.DatapathName)
 		checkFatal(err)
 		fastdp, err := weave.NewFastDatapath(iface, port)
 		checkFatal(err)
 		bridge = fastdp.Bridge()
 		overlay.Add("fastdp", fastdp.Overlay())
-	case ifaceName != "":
-		iface, err := weavenet.EnsureInterface(ifaceName)
+	case weavenet.Bridge:
+		bridgeIfName, pcapIfaceName := "vethwe-bridge", "vethwe-pcap"
+		_, err := weavenet.CreateAndAttachVeth(bridgeIfName, pcapIfaceName, config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+			return netlink.LinkSetUp(veth)
+		})
+		iface, err := weavenet.EnsureInterface(pcapIfaceName)
 		checkFatal(err)
 		bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
 		checkFatal(err)
