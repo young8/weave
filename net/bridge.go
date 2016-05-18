@@ -231,35 +231,15 @@ func initBridgedFastdp(config *BridgeConfig) error {
 	if err := initBridge(config); err != nil {
 		return err
 	}
-
-	link := &netlink.Veth{
-		LinkAttrs: netlink.LinkAttrs{
-			Name: "vethwe-bridge",
-			MTU:  config.MTU},
-		PeerName: "vethwe-datapath",
-	}
-
-	if err := netlink.LinkAdd(link); err != nil {
-		return err
-	}
-
-	bridge, err := netlink.LinkByName(config.WeaveBridgeName)
-	if err != nil {
-		return err
-	}
-
-	if err := netlink.LinkSetMasterByIndex(link, bridge.Attrs().Index); err != nil {
-		return err
-	}
-
-	if err := netlink.LinkSetUp(link); err != nil {
-		return err
-	}
-	if err := linkSetUpByName(link.PeerName); err != nil {
-		return err
-	}
-
-	if err := odp.AddDatapathInterface(config.DatapathName, link.PeerName); err != nil {
+	if _, err := CreateAndAttachVeth("vethwe-bridge", "vethwe-datapath", config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+		if err := netlink.LinkSetUp(veth); err != nil {
+			return err
+		}
+		if err := odp.AddDatapathInterface(config.DatapathName, veth.Attrs().Name); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		return err
 	}
 
