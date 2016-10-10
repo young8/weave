@@ -21,9 +21,9 @@ RUN apk add --update \
     bind-tools \
   && rm -rf /var/cache/apk/*
 
+ADD ./docker /usr/bin/
 ADD ./weave ./sigproxy ./weaveproxy ./symlink /home/weave/
 ADD ./weaveutil /usr/bin/
 ADD ./weavewait /w/w
 ADD ./weavewait_noop /w-noop/w
 ADD ./weavewait_nomcast /w-nomcast/w
-ADD ./docker.tgz /

@@ -50,7 +50,7 @@ IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(W
 
 WEAVE_EXPORT=weave.tar.gz
 
-WEAVEEXEC_DOCKER_VERSION=1.6.2
+WEAVEEXEC_DOCKER_VERSION=1.11.2
 DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
@@ -151,7 +151,8 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER
 	cp $(WEAVEWAIT_NOOP_EXE) prog/weaveexec/weavewait_noop
 	cp $(WEAVEWAIT_NOMCAST_EXE) prog/weaveexec/weavewait_nomcast
 	cp $(WEAVEUTIL_EXE) prog/weaveexec/weaveutil
-	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
+	tar xf $(DOCKER_DISTRIB) docker/docker -O > prog/weaveexec/docker
+	chmod +x prog/weaveexec/docker
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
