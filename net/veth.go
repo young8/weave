@@ -105,26 +105,21 @@ const (
 	vethPrefix = "v" + VethName // starts with "veth" to suppress UI notifications
 )
 
-func interfaceExistsInNamespace(netNSPath string, ifName string) bool {
-	_, err := WithNetNS(netNSPath, "check-iface", ifName)
+func interfaceExistsInNamespace(ns netns.NsHandle, ifName string) bool {
+	err := WithNetNSUnsafe(ns, func() error {
+		_, err := netlink.LinkByName(ifName)
+		return err
+	})
 	return err == nil
 }
 
-// NB: This function can be used only by a process that terminates immediately
-//     after calling the function as it changes netns via WithNetNSLinkUnsafe.
-func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool) error {
-	ns, err := netns.GetFromPath(netNSPath)
-	if err != nil {
-		return err
-	}
-	defer ns.Close()
-
+func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return err
 	}
 
-	if !interfaceExistsInNamespace(netNSPath, ifName) {
+	if !interfaceExistsInNamespace(ns, ifName) {
 		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"pl")
 		if len(id) > maxIDLen {
 			id = id[:maxIDLen] // trim passed ID if too long
@@ -134,7 +129,18 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
-			if _, err := WithNetNS(netNSPath, "setup-iface", peerName, ifName); err != nil {
+			if err := WithNetNSUnsafe(ns, func() error {
+				if err := netlink.LinkSetName(veth, ifName); err != nil {
+					return err
+				}
+				if err := ConfigureARPCache(ifName); err != nil {
+					return err
+				}
+				if err := ipt.Append("filter", "INPUT", "-i", ifName, "-d", "224.0.0.0/4", "-j", "DROP"); err != nil {
+					return err
+				}
+				return nil
+			}); err != nil {
 				return fmt.Errorf("error setting up interface: %s", err)
 			}
 			return nil
@@ -195,15 +201,7 @@ func AttachContainer(netNSPath, id, ifName, bridgeName string, mtu int, withMult
 	return nil
 }
 
-// NB: This function can be used only by a process that terminates immediately
-//     after calling the function as it changes netns via WithNetNSLinkUnsafe.
-func DetachContainer(netNSPath, id, ifName string, cidrs []*net.IPNet) error {
-	ns, err := netns.GetFromPath(netNSPath)
-	if err != nil {
-		return err
-	}
-	defer ns.Close()
-
+func DetachContainer(ns netns.NsHandle, id, ifName string, cidrs []*net.IPNet) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return err
