@@ -552,7 +552,7 @@ detect_bridge_type() {
 
 create_bridge() {
     validate_bridge_type
-    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP")
+    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP" "$1")
     MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
 }
 
@@ -1815,7 +1815,7 @@ EOF
         else
             shift 1
         fi
-        create_bridge
+        create_bridge "$@"
         ;;
     attach-bridge)
         if detect_bridge_type ; then

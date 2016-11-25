@@ -30,6 +30,7 @@ type BridgeConfig struct {
 	DatapathName     string
 	NoFastdp         bool
 	NoBridgedFastdp  bool
+	ExpectNPC        bool
 	MTU              int
 	Port             int
 }
@@ -290,12 +291,24 @@ func configureIPTables(config *BridgeConfig) error {
 		return err
 	}
 
-	// Work around the situation where there are no rules allowing traffic
-	// across our bridge. E.g. ufw
-	if err = ipt.AppendUnique("filter", "FORWARD", "-i", config.WeaveBridgeName, "-o", config.WeaveBridgeName, "-j", "ACCEPT"); err != nil {
-		return err
+	if config.ExpectNPC {
+		ipt.NewChain("nat", "WEAVE-NPC")
+		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "WEAVE-NPC"); err != nil {
+			return err
+		}
+		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"); err != nil {
+			return err
+		}
+		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "DROP"); err != nil {
+			return err
+		}
+	} else {
+		// Work around the situation where there are no rules allowing traffic
+		// across our bridge. E.g. ufw
+		if err = ipt.AppendUnique("filter", "FORWARD", "-i", config.WeaveBridgeName, "-o", config.WeaveBridgeName, "-j", "ACCEPT"); err != nil {
+			return err
+		}
 	}
-
 	// create a chain for masquerading
 	ipt.NewChain("nat", "WEAVE")
 	if err = ipt.AppendUnique("nat", "POSTROUTING", "-j", "WEAVE"); err != nil {
