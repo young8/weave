@@ -231,6 +231,7 @@ func main() {
 	}
 	bridgeType, err := weavenet.CreateBridge(&bridgeConfig)
 	checkFatal(err)
+	Log.Println("Bridge type is", bridgeType)
 	overlay, bridge := createOverlay(bridgeType, bridgeConfig, isAWSVPC, config.Host, config.Port, bufSzMB)
 	networkConfig.Bridge = bridge
 
