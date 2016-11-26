@@ -49,7 +49,8 @@ func EnforceDockerBridgeAddrAssignType(bridgeName string) error {
 	// #define NET_ADDR_RANDOM     1   /* address is generated randomly */
 	// #define NET_ADDR_STOLEN     2   /* address is stolen from other device */
 	// #define NET_ADDR_SET        3   /* address is set using dev_set_mac_address() */
-	if string(addrAssignType) != "3" {
+	// Note the file typically has a newline at the end, so we just look at the first char
+	if addrAssignType[0] != '3' {
 		link, err := netlink.LinkByName(bridgeName)
 		if err != nil {
 			return err
