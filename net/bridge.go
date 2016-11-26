@@ -1,6 +1,7 @@
 package net
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 
@@ -130,6 +131,8 @@ func DetectBridgeType(weaveBridgeName, datapathName string) BridgeType {
 	}
 }
 
+var ErrSetBridgeMac = errors.New("Setting $DOCKER_BRIDGE MAC (mitigate https://github.com/docker/docker/issues/14908)")
+
 func EnforceAddrAssignType(bridgeName string) error {
 	addrAssignType, err := ioutil.ReadFile(fmt.Sprintf("/sys/class/net/%s/addr_assign_type", bridgeName))
 	if err != nil {
@@ -156,6 +159,7 @@ func EnforceAddrAssignType(bridgeName string) error {
 		if err := netlink.LinkSetHardwareAddr(link, mac); err != nil {
 			return err
 		}
+		return ErrSetBridgeMac
 	}
 
 	return nil
