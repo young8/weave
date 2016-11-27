@@ -226,8 +226,10 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	if err := weavenet.EnforceAddrAssignType(bridgeConfig.DockerBridgeName); err != nil {
-		Log.Errorf("While checking address assignment type of %s: %s", bridgeConfig.DockerBridgeName, err)
+	if bridgeConfig.DockerBridgeName != "" {
+		if err := weavenet.EnforceAddrAssignType(bridgeConfig.DockerBridgeName); err != nil {
+			Log.Errorf("While checking address assignment type of %s: %s", bridgeConfig.DockerBridgeName, err)
+		}
 	}
 	bridgeType, err := weavenet.CreateBridge(&bridgeConfig)
 	checkFatal(err)
