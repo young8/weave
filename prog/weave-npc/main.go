@@ -181,7 +181,7 @@ func main() {
 		Run:   root}
 
 	rootCmd.PersistentFlags().StringVar(&metricsAddr, "metrics-addr", ":6781", "metrics server bind address")
-	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", false, "allow all multicast traffic")
+	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", true, "allow all multicast traffic")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)

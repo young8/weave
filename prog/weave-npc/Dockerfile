@@ -1,4 +1,4 @@
-FROM alpine
+FROM weaveworks/weaveexec
 RUN apk add --update \
     iptables \
     ipset \
