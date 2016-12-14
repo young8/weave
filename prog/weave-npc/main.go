@@ -26,6 +26,7 @@ import (
 var (
 	version     = "unreleased"
 	metricsAddr string
+	allowMcast  bool
 )
 
 func handleError(err error) {
@@ -59,6 +60,13 @@ func resetIPTables(ipt *iptables.IPTables) error {
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
 		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
 		return err
+	}
+
+	if allowMcast {
+		if err := ipt.Append(npc.TableFilter, npc.MainChain,
+			"-d", "224.0.0.0/4", "-j", "ACCEPT"); err != nil {
+			return err
+		}
 	}
 
 	if err := ipt.Append(npc.TableFilter, npc.MainChain,
@@ -173,6 +181,7 @@ func main() {
 		Run:   root}
 
 	rootCmd.PersistentFlags().StringVar(&metricsAddr, "metrics-addr", ":6781", "metrics server bind address")
+	rootCmd.PersistentFlags().BoolVar(&allowMcast, "allow-mcast", false, "allow all multicast traffic")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
