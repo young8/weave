@@ -1,6 +1,7 @@
 package net
 
 import (
+	"errors"
 	"io/ioutil"
 	"net"
 	"os"
@@ -24,26 +25,29 @@ func getSystemUUID(hostRoot string) ([]byte, error) {
 	}
 	machineid, err := ioutil.ReadFile(hostRoot + "/etc/machine-id")
 	if os.IsNotExist(err) {
-		machineid, _ = ioutil.ReadFile(hostRoot + "/var/lib/dbus/machine-id")
+		machineid, err = ioutil.ReadFile(hostRoot + "/var/lib/dbus/machine-id")
 	}
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
+	if len(uuid) == 0 {
+		return nil, errors.New("All system IDs are blank")
+	}
 	return append(machineid, uuid...), nil
 }
 
-func getPersistedPeerName(dbPrefix string) mesh.PeerName {
+func getPersistedPeerName(dbPrefix string) (mesh.PeerName, error) {
 	d, err := db.NewBoltDBReadOnly(dbPrefix + db.FileName)
 	if err != nil {
-		return mesh.UnknownPeerName
+		return mesh.UnknownPeerName, err
 	}
 	defer d.Close()
 	var peerName mesh.PeerName
 	nameFound, err := d.Load(db.NameIdent, &peerName)
 	if err != nil || !nameFound {
-		return mesh.UnknownPeerName
+		return mesh.UnknownPeerName, err
 	}
-	return peerName
+	return peerName, nil
 }
 
 // GetSystemPeerName returns an ID derived from concatenated machine-id
@@ -52,16 +56,22 @@ func getPersistedPeerName(dbPrefix string) mesh.PeerName {
 func GetSystemPeerName(dbPrefix, hostRoot string) (string, error) {
 	// Check if we have a persisted name that matches the old-style ID for this host
 	if oldUUID, err := getOldStyleSystemUUID(); err == nil {
-		persistedPeerName := getPersistedPeerName(dbPrefix)
+		persistedPeerName, err := getPersistedPeerName(dbPrefix)
+		if err != nil && !os.IsNotExist(err) {
+			return "", err
+		}
 		if persistedPeerName == mesh.PeerNameFromBin(MACfromUUID(oldUUID)) {
 			return persistedPeerName.String(), nil
 		}
+	} else if !os.IsNotExist(err) {
+		return "", err
 	}
 	var mac net.HardwareAddr
-	if uuid, err := getSystemUUID(hostRoot); err == nil && len(uuid) > 0 {
+	if uuid, err := getSystemUUID(hostRoot); err == nil {
 		mac = MACfromUUID(uuid)
+	} else if !os.IsNotExist(err) {
+		return "", err
 	} else {
-		// It's a bit worrying that we silently drop any error from getSystemUUID
 		mac, err = RandomMAC()
 		if err != nil {
 			return "", err
