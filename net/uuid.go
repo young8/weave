@@ -33,7 +33,7 @@ func getSystemUUID(hostRoot string) ([]byte, error) {
 }
 
 func getPersistedPeerName(dbPrefix string) mesh.PeerName {
-	d, err := db.NewBoltDBReadOnly(dbPrefix + "data.db")
+	d, err := db.NewBoltDBReadOnly(dbPrefix + db.FileName)
 	if err != nil {
 		return mesh.UnknownPeerName
 	}
@@ -53,13 +53,13 @@ func GetSystemPeerName(dbPrefix, hostRoot string) (string, error) {
 	// Check if we have a persisted name that matches the old-style ID for this host
 	if oldUUID, err := getOldStyleSystemUUID(); err == nil {
 		persistedPeerName := getPersistedPeerName(dbPrefix)
-		if persistedPeerName == mesh.PeerNameFromBin(PersistentMAC(oldUUID)) {
+		if persistedPeerName == mesh.PeerNameFromBin(MACfromUUID(oldUUID)) {
 			return persistedPeerName.String(), nil
 		}
 	}
 	var mac net.HardwareAddr
 	if uuid, err := getSystemUUID(hostRoot); err == nil && len(uuid) > 0 {
-		mac = PersistentMAC(uuid)
+		mac = MACfromUUID(uuid)
 	} else {
 		// It's a bit worrying that we silently drop any error from getSystemUUID
 		mac, err = RandomMAC()

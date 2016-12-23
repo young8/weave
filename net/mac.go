@@ -17,8 +17,11 @@ func RandomMAC() (net.HardwareAddr, error) {
 	return net.HardwareAddr(mac), nil
 }
 
-func PersistentMAC(uuid []byte) net.HardwareAddr {
+func MACfromUUID(uuid []byte) net.HardwareAddr {
 	hash := sha256.New()
+	// We salt the input just as a precaution to avoid clashes with
+	// other applications who might have had the bright idea of
+	// generating MACs in the same way.
 	hash.Write([]byte("9oBJ0Jmip-"))
 	hash.Write(uuid)
 	sum := hash.Sum(nil)
@@ -28,6 +31,8 @@ func PersistentMAC(uuid []byte) net.HardwareAddr {
 	return net.HardwareAddr(sum[:6])
 }
 
+// In the first byte of the MAC, the 'multicast' bit should be
+// clear and 'locally administered' bit should be set.
 func setUnicastAndLocal(mac []byte) {
 	mac[0] = (mac[0] & 0xFE) | 0x02
 }

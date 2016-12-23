@@ -26,6 +26,7 @@ var (
 
 const (
 	NameIdent = "peername"
+	FileName  = "data.db"
 )
 
 func NewBoltDB(dbPathname string) (*BoltDB, error) {
@@ -45,7 +46,7 @@ func NewBoltDBReadOnly(dbPathname string) (*BoltDB, error) {
 	}
 	err = db.View(checkVersion(true))
 	if err != nil {
-		return nil, fmt.Errorf("[boltDB] Cannot use persistence file %s - %s", dbPathname, err)
+		return nil, fmt.Errorf("[boltDB] Cannot use persistence file %s: %s", dbPathname, err)
 	}
 	return &BoltDB{db: db}, nil
 }
