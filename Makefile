@@ -211,3 +211,21 @@ build:
 
 run-smoketests: all testrunner
 	cd test && ./setup.sh && ./run_all.sh
+
+integration-tests: all testrunner
+	# Usage:
+	#   $ make \
+	#     PROVIDER="<provider>" \
+	#     NUM_HOSTS="<# test machines>" \
+	#     PLAYBOOK="<filename>" \
+	#     RUNNER_ARGS="<...>" \
+	#     TESTS="<...>" \
+	#     SKIP_CONFIG="<yes/no>" \
+	#     SKIP_DESTROY="<yes/no>" \
+	#     DOCKER_VERSION=<...> \
+	#     KUBERNETES_VERSION=<...> \
+	#     KUBERNETES_CNI_VERSION=<...> \
+	#     integration-tests
+	# where provider among: {vagrant|gcp|aws|do}.
+	#
+	RUNNER_ARGS="-parallel" ./test/run-integration-tests.sh
