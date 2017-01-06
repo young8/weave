@@ -1,0 +1,21 @@
+{
+            "Description": "Weave Net plugin for Docker",
+            "Documentation": "https://weave.works",
+            "Entrypoint": [
+                "/home/weave/launch.sh"
+            ],
+            "Interface": {
+                "Socket": "weave.sock",
+                "Types": [
+                    "docker.networkdriver/1.0"
+                ]
+            },
+            "Linux": {
+                "Capabilities": ["CAP_SYS_ADMIN", "CAP_NET_ADMIN"]
+            },
+            "Mounts": null,
+            "Network": {
+                "Type": "host"
+            },
+            "Workdir": ""
+}
