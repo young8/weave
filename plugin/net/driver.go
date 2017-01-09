@@ -43,9 +43,11 @@ func New(client *docker.Client, weave *weaveapi.Client, name, scope string) (ske
 		networks: make(map[string]network),
 	}
 
-	_, err := NewWatcher(client, weave, driver)
-	if err != nil {
-		return nil, err
+	if client != nil {
+		_, err := NewWatcher(client, weave, driver)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return driver, nil
 }
@@ -139,7 +141,7 @@ func (driver *driver) EndpointInfo(req *api.EndpointInfoRequest) (*api.EndpointI
 func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error) {
 	driver.logReq("JoinEndpoint", j, fmt.Sprintf("%s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey))
 
-	network, err := driver.findNetworkInfo(j.NetworkID)
+	network, err := network{}, error(nil) //driver.findNetworkInfo(j.NetworkID)
 	if err != nil {
 		return nil, driver.error("JoinEndpoint", "unable to find network info: %s", err)
 	}
